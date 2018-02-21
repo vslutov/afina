@@ -45,8 +45,9 @@ bool MapBasedGlobalLockImpl::Set(const std::string &key, const std::string &valu
 bool MapBasedGlobalLockImpl::Delete(const std::string &key) {
     std::lock_guard<std::mutex> lock(_mutex);
 
-    _cache_list.erase(_cache_map[key]);
-    _cache_map.erase(key);
+    auto key_value = _cache_map.find(key);
+    _cache_list.erase(key_value->second);
+    _cache_map.erase(key_value);
     return true;
 }
 
@@ -80,7 +81,7 @@ bool MapBasedGlobalLockImpl::_Push(const Key &key, const Value &value) {
     }
 
     _cache_list.emplace_front(key, value);
-    _cache_map[_cache_list.front().first] = _cache_list.cbegin();
+    _cache_map.emplace(_cache_list.front().first, _cache_list.cbegin());
     return true;
 }
 
