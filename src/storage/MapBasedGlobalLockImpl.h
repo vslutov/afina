@@ -47,16 +47,16 @@ private:
     using list_const_iterator = typename List::const_iterator;
     using Map = std::unordered_map<std::reference_wrapper<const Key>, list_const_iterator, std::hash<Key>, std::equal_to<Key>>;
 
-    size_t _max_size;
-    List _cache_list;
+    const size_t _max_size;
+    mutable List _cache_list;
     Map _cache_map;
-    std::mutex _mutex;
+    mutable std::mutex _mutex;
 
     bool
     _Has(const Key &) const;
 
     void
-    _MoveHead(const Key &);
+    _MoveHead(const Key &) const;
 
 
     void

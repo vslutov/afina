@@ -1,4 +1,5 @@
 .idea
+.*.swp
 generated/*
 
 # local cmake builds

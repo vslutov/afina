@@ -62,13 +62,12 @@ MapBasedGlobalLockImpl::Delete(const std::string &key)
 bool
 MapBasedGlobalLockImpl::Get(const std::string &key, std::string &value) const
 {
-    auto self = const_cast<MapBasedGlobalLockImpl *>(this);
-    std::lock_guard<std::mutex> lock(self->_mutex);
+    std::lock_guard<std::mutex> lock(_mutex);
 
     if (!_Has(key)) {
         return false;
     } else {
-        self->_MoveHead(key);
+        _MoveHead(key);
         value = _cache_list.front().second;
         return true;
     }
@@ -81,9 +80,9 @@ MapBasedGlobalLockImpl::_Has(const Key &key) const
 }
 
 void
-MapBasedGlobalLockImpl::_MoveHead(const Key &key)
+MapBasedGlobalLockImpl::_MoveHead(const Key &key) const
 {
-    _cache_list.splice(_cache_list.begin(), _cache_list, _cache_map[key]);
+    _cache_list.splice(_cache_list.begin(), _cache_list, _cache_map.find(key)->second);
 }
 
 void
