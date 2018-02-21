@@ -4,6 +4,9 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <unordered_map>
+#include <list>
+#include <mutex>
 
 #include <afina/Storage.h>
 
@@ -36,8 +39,31 @@ public:
     bool Get(const std::string &key, std::string &value) const override;
 
 private:
+
+    using Key = std::string;
+    using Value = std::string;
+    using KeyValue = std::pair<Key, Value>;
+    using List = std::list<KeyValue>;
+    using list_const_iterator = typename List::const_iterator;
+    using Map = std::unordered_map<std::reference_wrapper<const Key>, list_const_iterator, std::hash<Key>, std::equal_to<Key>>;
+
     size_t _max_size;
-    std::map<std::string, std::string> _backend;
+    List _cache_list;
+    Map _cache_map;
+    std::mutex _mutex;
+
+    bool
+    _Has(const Key &) const;
+
+    void
+    _MoveHead(const Key &);
+
+
+    void
+    _RemoveTail(void);
+
+    bool
+    _Push(const Key &key, const Value &value);
 };
 
 } // namespace Backend
