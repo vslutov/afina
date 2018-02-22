@@ -20,7 +20,8 @@ namespace Backend {
  */
 class MapBasedGlobalLockImpl : public Afina::Storage {
 public:
-    MapBasedGlobalLockImpl(size_t max_size = 1024) : _max_size(max_size) {}
+    MapBasedGlobalLockImpl(size_t = 1024);
+
     ~MapBasedGlobalLockImpl() {}
 
     // Implements Afina::Storage interface
@@ -41,13 +42,14 @@ public:
 private:
     using Key = std::string;
     using Value = std::string;
-    using KeyValue = std::pair<Key, Value>;
+    using KeyValue = std::pair<const Key, Value>;
     using List = std::list<KeyValue>;
     using list_const_iterator = typename List::const_iterator;
     using Map =
         std::unordered_map<std::reference_wrapper<const Key>, list_const_iterator, std::hash<Key>, std::equal_to<Key>>;
 
     const size_t _max_size;
+    size_t _size;
     mutable List _cache_list;
     Map _cache_map;
     mutable std::mutex _mutex;
