@@ -8,7 +8,9 @@
 #include <memory>
 #include <stdexcept>
 #include <algorithm>
+#include <chrono>
 
+#include <thread>
 #include <pthread.h>
 #include <signal.h>
 
@@ -55,8 +57,9 @@ void *ServerImpl::RunConnectionProxy(void *p) {
 
     {
         close(client_socket);
-        std::lock_guard<std::mutex> lock(srv->connections_mutex);
+        std::unique_lock<std::mutex> lock(srv->connections_mutex);
         srv->connections.erase(pthread_self());
+        srv->connections_cv.notify_all();
     }
 
     return 0;
@@ -119,6 +122,7 @@ void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
 // See Server.h
 void ServerImpl::Stop() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
+    shutdown(server_socket, SHUT_RDWR);
     running.store(false);
 }
 
@@ -152,7 +156,7 @@ void ServerImpl::RunAcceptor() {
     // - Family: IPv4
     // - Type: Full-duplex stream (reliable)
     // - Protocol: TCP
-    int server_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    server_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (server_socket == -1) {
         throw std::runtime_error("Failed to open socket");
     }
@@ -195,12 +199,14 @@ void ServerImpl::RunAcceptor() {
         // When an incoming connection arrives, accept it. The call to accept() blocks until
         // the incoming connection arrives
         if ((client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &sinSize)) == -1) {
-            close(server_socket);
+            if (errno == EINVAL) {
+                break;
+            }
             throw std::runtime_error("Socket accept() failed");
         }
 
         {
-            std::lock_guard<std::mutex> lock(connections_mutex);
+            std::unique_lock<std::mutex> lock(connections_mutex);
             if (connections.size() < max_workers)
             {
                 pthread_t worker;
@@ -214,6 +220,13 @@ void ServerImpl::RunAcceptor() {
             } else {
                 close(client_socket);
             }
+        }
+    }
+
+    {
+        std::unique_lock<std::mutex> lock(connections_mutex);
+        if (connections.size()) {
+            connections_cv.wait(lock, [this]{return !connections.size();});
         }
     }
 
@@ -252,6 +265,10 @@ void ServerImpl::RunConnection(int client_socket) {
             }
 
             parser.Reset();
+
+            if (!running.load()) {
+                break;
+            }
         }
     }
 
@@ -261,7 +278,6 @@ void ServerImpl::RunConnection(int client_socket) {
 }
 
 std::string ServerImpl::ReadData(int client_socket, char buf[], ssize_t &buf_readed, ssize_t body_size) {
-    std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
     std::stringbuf sbuf;
 
     while (body_size > 0) {
@@ -280,8 +296,6 @@ std::string ServerImpl::ReadData(int client_socket, char buf[], ssize_t &buf_rea
 }
 
 void ServerImpl::RemovePrefix(char buf[], size_t &parsed, ssize_t &buf_readed) {
-    std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
-
     for (ssize_t i = 0; i < buf_readed - parsed; ++ i) {
         buf[i] = buf[i + parsed];
     }
