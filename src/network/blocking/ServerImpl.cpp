@@ -1,18 +1,18 @@
 #include "ServerImpl.h"
 #include "../../protocol/Parser.h"
 
+#include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cstring>
-#include <sstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
-#include <algorithm>
-#include <chrono>
 
-#include <thread>
 #include <pthread.h>
 #include <signal.h>
+#include <thread>
 
 #include <netdb.h>
 #include <sys/socket.h>
@@ -207,8 +207,7 @@ void ServerImpl::RunAcceptor() {
 
         {
             std::unique_lock<std::mutex> lock(connections_mutex);
-            if (connections.size() < max_workers)
-            {
+            if (connections.size() < max_workers) {
                 pthread_t worker;
                 auto args = new RunConnectionProxyArgs(this, client_socket);
 
@@ -226,7 +225,7 @@ void ServerImpl::RunAcceptor() {
     {
         std::unique_lock<std::mutex> lock(connections_mutex);
         if (connections.size()) {
-            connections_cv.wait(lock, [this]{return !connections.size();});
+            connections_cv.wait(lock, [this] { return !connections.size(); });
         }
     }
 
@@ -296,7 +295,7 @@ std::string ServerImpl::ReadData(int client_socket, char buf[], ssize_t &buf_rea
 }
 
 void ServerImpl::RemovePrefix(char buf[], size_t &parsed, ssize_t &buf_readed) {
-    for (ssize_t i = 0; i < buf_readed - parsed; ++ i) {
+    for (ssize_t i = 0; i < buf_readed - parsed; ++i) {
         buf[i] = buf[i + parsed];
     }
 

@@ -2,10 +2,10 @@
 #define AFINA_NETWORK_BLOCKING_SERVER_H
 
 #include <atomic>
-#include <tuple>
 #include <condition_variable>
 #include <mutex>
 #include <pthread.h>
+#include <tuple>
 #include <unordered_set>
 
 #include <afina/network/Server.h>
@@ -81,7 +81,7 @@ private:
 
     static std::string ReadData(int, char[], ssize_t &, ssize_t);
 
-    static void RemovePrefix(char [], size_t &, ssize_t &);
+    static void RemovePrefix(char[], size_t &, ssize_t &);
 };
 
 } // namespace Blocking
