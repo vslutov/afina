@@ -54,7 +54,7 @@ void *ServerImpl::RunConnectionProxy(ServerImpl *srv, int client_socket) {
 }
 
 // See Server.h
-ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps) : pool(10, 50, 50, 1000), Server(ps) {}
+ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps) : pool(1, 50, 50, 1000), Server(ps) {}
 
 // See Server.h
 ServerImpl::~ServerImpl() {}
@@ -204,9 +204,7 @@ void ServerImpl::RunAcceptor() {
         }
     }
 
-    std::cerr << "exiting" << std::endl;
     pool.Stop(true);
-    std::cerr << "exited" << std::endl;
 
     // Cleanup on exit...
     close(server_socket);

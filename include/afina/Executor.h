@@ -97,6 +97,7 @@ private:
      * Conditional variable to await new data in case of empty queue
      */
     std::condition_variable empty_condition;
+    std::condition_variable stopped;
 
     /**
      * Vector of actual threads that perorm execution

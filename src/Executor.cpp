@@ -1,7 +1,5 @@
 #include <afina/Executor.h>
 
-#include <iostream>
-
 namespace Afina {
 
 void
@@ -38,7 +36,7 @@ Executor::perform(void *data)
             if (self->state == State::kStopping) {
                 self->threads.erase(pthread_self());
                 if (!self->threads.size()) {
-                    self->empty_condition.notify_all();
+                    self->stopped.notify_all();
                 }
                 return nullptr;
             }
@@ -70,11 +68,11 @@ Executor::_add_thread()
 }
 
 void Executor::Stop(bool await) {
-    std::unique_lock<std::mutex> lock;
+    std::unique_lock<std::mutex> lock(mutex);
     if (threads.size()) {
         state = State::kStopping;
         if (await) {
-            empty_condition.wait(lock, [this] { return !threads.size(); });
+            stopped.wait(lock, [this] { return !threads.size(); });
         }
         state = State::kStopped;
     } else {

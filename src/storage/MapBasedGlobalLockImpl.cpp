@@ -11,9 +11,24 @@ MapBasedGlobalLockImpl::MapBasedGlobalLockImpl(size_t max_size) : _max_size(max_
 bool MapBasedGlobalLockImpl::Put(const std::string &key, const std::string &value) {
     std::lock_guard<std::mutex> lock(_mutex);
 
+    auto elem_size = key.size() + value.size();
+
+    if (elem_size > _max_size) {
+        return false;
+    }
+
     if (_Has(key)) {
         _MoveHead(key);
+
+        auto diff_size = static_cast<ssize_t>(value.size()) - _cache_list.front().second.size();
+        while (_size + diff_size > _max_size) {
+            _RemoveTail();
+        }
+
         _cache_list.front().second = value;
+        _size += diff_size;
+
+        return true;
     }
 
     return _Push(key, value);
@@ -48,6 +63,7 @@ bool MapBasedGlobalLockImpl::Delete(const std::string &key) {
     std::lock_guard<std::mutex> lock(_mutex);
 
     auto key_value = _cache_map.find(key);
+    _size -= key_value->second->first.size() + key_value->second->first.size();
     _cache_list.erase(key_value->second);
     _cache_map.erase(key_value);
     return true;
