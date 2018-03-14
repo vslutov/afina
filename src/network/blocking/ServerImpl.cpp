@@ -204,7 +204,9 @@ void ServerImpl::RunAcceptor() {
         }
     }
 
+    std::cerr << "exiting" << std::endl;
     pool.Stop(true);
+    std::cerr << "exited" << std::endl;
 
     // Cleanup on exit...
     close(server_socket);

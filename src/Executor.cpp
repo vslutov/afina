@@ -1,5 +1,7 @@
 #include <afina/Executor.h>
 
+#include <iostream>
+
 namespace Afina {
 
 void
