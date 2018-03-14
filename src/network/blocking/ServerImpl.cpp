@@ -41,38 +41,27 @@ void *ServerImpl::RunAcceptorProxy(void *p) {
     return 0;
 }
 
-void *ServerImpl::RunConnectionProxy(void *p) {
-    ServerImpl *srv;
-    int client_socket;
-
-    auto args = reinterpret_cast<RunConnectionProxyArgs *>(p);
-    std::tie(srv, client_socket) = *args;
-    delete args;
-
+void *ServerImpl::RunConnectionProxy(ServerImpl *srv, int client_socket) {
     try {
         srv->RunConnection(client_socket);
     } catch (std::runtime_error &ex) {
         std::cerr << "Server fails: " << ex.what() << std::endl;
     }
 
-    {
-        close(client_socket);
-        std::unique_lock<std::mutex> lock(srv->connections_mutex);
-        srv->connections.erase(pthread_self());
-        srv->connections_cv.notify_all();
-    }
+    close(client_socket);
 
     return 0;
 }
 
 // See Server.h
-ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps) : Server(ps) {}
+ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps) : pool(10, 50, 50, 1000), Server(ps) {}
 
 // See Server.h
 ServerImpl::~ServerImpl() {}
 
 // See Server.h
-void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
+void ServerImpl::Start(uint32_t port, uint16_t n_workers)
+{
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
 
     // If a client closes a connection, this will generally produce a SIGPIPE
@@ -87,7 +76,6 @@ void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
 
     // Setup server parameters BEFORE thread created, that will guarantee
     // variable value visibility
-    max_workers = n_workers;
     listen_port = port;
 
     // The pthread_create function creates a new thread.
@@ -206,28 +194,17 @@ void ServerImpl::RunAcceptor() {
         }
 
         {
-            std::unique_lock<std::mutex> lock(connections_mutex);
-            if (connections.size() < max_workers) {
-                pthread_t worker;
-                auto args = new RunConnectionProxyArgs(this, client_socket);
-
-                if (pthread_create(&worker, NULL, ServerImpl::RunConnectionProxy, args) < 0) {
-                    throw std::runtime_error("Could not create server thread");
+            if (!pool.Execute(ServerImpl::RunConnectionProxy, this, client_socket)) {
+                const char server_error[] = "SERVER_ERROR Server busy\r\n";
+                if (send(client_socket, server_error, sizeof(server_error), 0) <= 0) {
+                    close(client_socket);
+                    throw std::runtime_error("Socket send() failed");
                 }
-
-                connections.insert(worker);
-            } else {
-                close(client_socket);
             }
         }
     }
 
-    {
-        std::unique_lock<std::mutex> lock(connections_mutex);
-        if (connections.size()) {
-            connections_cv.wait(lock, [this] { return !connections.size(); });
-        }
-    }
+    pool.Stop(true);
 
     // Cleanup on exit...
     close(server_socket);

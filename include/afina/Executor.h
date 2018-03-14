@@ -7,7 +7,8 @@
 #include <mutex>
 #include <queue>
 #include <string>
-#include <thread>
+#include <unordered_set>
+#include <pthread.h>
 
 namespace Afina {
 
@@ -15,6 +16,7 @@ namespace Afina {
  * # Thread pool
  */
 class Executor {
+private:
     enum class State {
         // Threadpool is fully operational, tasks could be added and get executed
         kRun,
@@ -27,8 +29,9 @@ class Executor {
         kStopped
     };
 
-    Executor(std::string name, int size);
-    ~Executor();
+public:
+    Executor(size_t, size_t, size_t, size_t);
+    ~Executor() = default;
 
     /**
      * Signal thread pool to stop, it will stop accepting new jobs and close threads just after each become
@@ -50,8 +53,12 @@ class Executor {
         auto exec = std::bind(std::forward<F>(func), std::forward<Types>(args)...);
 
         std::unique_lock<std::mutex> lock(this->mutex);
-        if (state != State::kRun) {
+        if (state != State::kRun || tasks.size() == _max_queue_size) {
             return false;
+        }
+
+        if (_busy_workers == threads.size() && threads.size() < _high_watermark) {
+            _add_thread();
         }
 
         // Enqueue new task
@@ -62,15 +69,24 @@ class Executor {
 
 private:
     // No copy/move/assign allowed
-    Executor(const Executor &);            // = delete;
-    Executor(Executor &&);                 // = delete;
-    Executor &operator=(const Executor &); // = delete;
-    Executor &operator=(Executor &&);      // = delete;
+    Executor(const Executor &) = delete;
+    Executor(Executor &&) = delete;
+    Executor &operator=(const Executor &) = delete;
+    Executor &operator=(Executor &&) = delete;
+
+    size_t _low_watermark;
+    size_t _high_watermark;
+    size_t _max_queue_size;
+    std::chrono::milliseconds _idle_time;
+
+    size_t _busy_workers = 0;
 
     /**
      * Main function that all pool threads are running. It polls internal task queue and execute tasks
      */
-    friend void perform(Executor *executor);
+    static void *perform(void *executor);
+    void _add_thread();
+    void _run_task(std::unique_lock<std::mutex> &);
 
     /**
      * Mutex to protect state below from concurrent modification
@@ -85,7 +101,7 @@ private:
     /**
      * Vector of actual threads that perorm execution
      */
-    std::vector<std::thread> threads;
+    std::unordered_set<pthread_t> threads;
 
     /**
      * Task queue

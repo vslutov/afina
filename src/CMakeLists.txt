@@ -13,8 +13,12 @@ add_subdirectory(storage)
 set(version_file "${CMAKE_CURRENT_BINARY_DIR}/Version.cpp")
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Version.cpp.in ${version_file})
 
+# Executor
+add_library(Executor Executor.cpp)
+target_link_libraries(Executor ${CMAKE_THREAD_LIBS_INIT})
+
 # build service
 set(SOURCE_FILES main.cpp ${version_file})
 add_executable(afina ${SOURCE_FILES} ${BACKWARD_ENABLE})
-target_link_libraries(afina Network Storage cxxopts)
+target_link_libraries(afina Network Storage cxxopts Executor)
 add_backward(afina)
